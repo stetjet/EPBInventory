@@ -1,6 +1,7 @@
 import sqlite3 as sql
+from paths import DB_PATH
 
-conn = sql.connect('EPB_point_shoe_inv.db')
+conn = sql.connect(DB_PATH)
 cur = conn.cursor()
 
 

@@ -1,9 +1,11 @@
 import customtkinter as ctk
 from schema import *
 import yaml
-from favorite_functions import *
+from favorite_functions import debug_print, GridManager, proper_string_from_snake_case, force_csv_close_and_delete
 import csv
 from tkinter import messagebox as mb
+from paths import FILTERS_PATH, REPORT_PATH
+import os
 
 # to do:
 #settings to allow for changing filter options
@@ -12,7 +14,7 @@ from tkinter import messagebox as mb
 #make student searchable instead of exact match
 
 
-with open('filters.yaml', 'r') as filters_file:
+with open(FILTERS_PATH, 'r') as filters_file:
     filter_options = yaml.safe_load(filters_file)
 
 minwidths = [50, 80, 100, 150, 100, 100, 100, 100, 60, 100, 120, 60, 460]
@@ -261,42 +263,48 @@ def assign_bag(shoe:ShoeFrame):
         raise e
 
 def inventory_report():
-    try:
-        cur.execute(_build_filtered_query())
-        shoes = cur.fetchall()
-        for index, shoe in enumerate(shoes):
-            #                                               shoe_id, bag,   style,     size,    width,   shank,   vamp,    shape,   sole, availability,    student, comments
-            shoe_frame = ShoeFrame(None, None, shoe[0], shoe[1], shoe[2], shoe[3], shoe[4], shoe[5], shoe[6], shoe[7], shoe[8], shoe[9], shoe[10], shoe[11])
 
-        shoe_report_dict = {}
-        for shoe in active_shoes:
-            shoe_dict = {'Total Unsold Inventory': 0, 'Total Sold': 0, 'Ordered': 0, 'Available': 0, 'Reserved': 0, 'Other': 0}
-            if shoe.product_id not in shoe_report_dict.keys():
-                shoe_report_dict[shoe.product_id] = shoe_dict
-            if shoe.availability == 'Ordered':
-                shoe_report_dict[shoe.product_id]['Ordered'] += 1
-                shoe_report_dict[shoe.product_id]['Total Unsold Inventory'] += 1
-            if shoe.availability == 'Available':
-                shoe_report_dict[shoe.product_id]['Available'] += 1
-                shoe_report_dict[shoe.product_id]['Total Unsold Inventory'] += 1
-            if shoe.availability == 'Reserved':
-                shoe_report_dict[shoe.product_id]['Reserved'] += 1
-                shoe_report_dict[shoe.product_id]['Total Unsold Inventory'] += 1
-            if shoe.availability == 'Other':
-                shoe_report_dict[shoe.product_id]['Other'] += 1
-            if shoe.availability == 'Sold':
-                shoe_report_dict[shoe.product_id]['Total Sold'] += 1
+    if force_csv_close_and_delete(REPORT_PATH):
+        try:
+            cur.execute(_build_filtered_query())
+            shoes = cur.fetchall()
+            for index, shoe in enumerate(shoes):
+                #                                               shoe_id, bag,   style,     size,    width,   shank,   vamp,    shape,   sole, availability,    student, comments
+                shoe_frame = ShoeFrame(None, None, shoe[0], shoe[1], shoe[2], shoe[3], shoe[4], shoe[5], shoe[6], shoe[7], shoe[8], shoe[9], shoe[10], shoe[11])
 
-        debug_print(shoe_report_dict)
-    except Exception as e:
-        debug_print(e)
-        raise e
+            shoe_report_dict = {}
+            for shoe in active_shoes:
+                shoe_dict = {'Total Unsold Inventory': 0, 'Total Sold': 0, 'Ordered': 0, 'Available': 0, 'Reserved': 0, 'Other': 0}
+                if shoe.product_id not in shoe_report_dict.keys():
+                    shoe_report_dict[shoe.product_id] = shoe_dict
+                if shoe.availability == 'Ordered':
+                    shoe_report_dict[shoe.product_id]['Ordered'] += 1
+                    shoe_report_dict[shoe.product_id]['Total Unsold Inventory'] += 1
+                if shoe.availability == 'Available':
+                    shoe_report_dict[shoe.product_id]['Available'] += 1
+                    shoe_report_dict[shoe.product_id]['Total Unsold Inventory'] += 1
+                if shoe.availability == 'Reserved':
+                    shoe_report_dict[shoe.product_id]['Reserved'] += 1
+                    shoe_report_dict[shoe.product_id]['Total Unsold Inventory'] += 1
+                if shoe.availability == 'Other':
+                    shoe_report_dict[shoe.product_id]['Other'] += 1
+                if shoe.availability == 'Sold':
+                    shoe_report_dict[shoe.product_id]['Total Sold'] += 1
 
-    with open('inventory_report.csv', 'w') as report:
-        pencil = csv.writer(report)
-        pencil.writerow(['Product ID', 'Total Unsold Inventory', 'Total Sold', 'Ordered', 'Available', 'Reserved', 'Other'])
-        for shoe in shoe_report_dict:
-            pencil.writerow([shoe, shoe_report_dict[shoe]['Total Unsold Inventory'], shoe_report_dict[shoe]['Total Sold'], shoe_report_dict[shoe]['Ordered'], shoe_report_dict[shoe]['Available'], shoe_report_dict[shoe]['Reserved'], shoe_report_dict[shoe]['Other']])
+            debug_print(shoe_report_dict)
+        except Exception as e:
+            debug_print(e)
+            raise e
+
+        with open(REPORT_PATH, 'w') as report:
+            pencil = csv.writer(report)
+            pencil.writerow(['Product ID', 'Total Unsold Inventory', 'Total Sold', 'Ordered', 'Available', 'Reserved', 'Other'])
+            for shoe in shoe_report_dict:
+                pencil.writerow([shoe, shoe_report_dict[shoe]['Total Unsold Inventory'], shoe_report_dict[shoe]['Total Sold'], shoe_report_dict[shoe]['Ordered'], shoe_report_dict[shoe]['Available'], shoe_report_dict[shoe]['Reserved'], shoe_report_dict[shoe]['Other']])
+            os.startfile(REPORT_PATH)
+    else:
+        mb.showerror('Report In Use', 'Close the inventory report in Excel and try again.')
+        return
 
 def retrieve_columns(tablename):
     cur.execute(f"""PRAGMA table_info({tablename});""")
