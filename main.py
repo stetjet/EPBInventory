@@ -8,12 +8,10 @@ from paths import FILTERS_PATH, REPORT_PATH
 import os
 
 # to do:
-#make create_shoes close on button click
 #main_frame automatically updates after changes
 #make student searchable instead of exact match
 #options for sorting csv
 #add search by bag
-#add clear filters
 #make shoe_pk = bag. Can force pk?
 #add toepad, spacer, date sold
 #mark as reported on the reorder doc - Maybe this one belongs to the product id?
@@ -309,6 +307,7 @@ def create_shoe(quantity, filters, close_window, main_frame):
         values = cur.fetchall()[0]
         debug_print(values)
         display_shoe = ShoeFrame(display_frame, main_gridder, values[0], values[1], values[2], values[3], values[4], values[5], values[6], values[7], values[8], values[9], values[10], values[11])
+        display_shoe.checkbox.grid_forget()
         main_gridder.next_row()
 
     main_gridder.set_column(0)
@@ -504,6 +503,7 @@ def main():
     debug_print(filters)
 
 
+
     for row in range(0, 9):
         app.rowconfigure(row, weight = 1)
 
@@ -528,17 +528,24 @@ def main():
     mark_sold_butt = ctk.CTkButton(top_frame, text = 'Mark Selected as Sold', command = lambda : sell_shoes())
     mark_sold_butt.grid(row = 2, column = 4)
 
+    # ----------
+    # END TOP FRAME
+    # BEGIN LEFT FRAME
+    # ----------
+
     left_frame = ctk.CTkFrame(app, border_width = 1, border_color = 'green')
     left_frame.grid(row = 1, column = 0, rowspan = 6, sticky = 'nsew')
 
     left_gridder = GridManager()
 
     search_terms = {}
+    dropdowns = []
     for filter in filter_options.keys():
         debug_print(filter)
 
         filter_input = FilterDropdown(left_frame, filter, filter_options[filter], ctk.StringVar(filters[filter]), filters)
         filter_input.grid(row = left_gridder.row, column = left_gridder.column, sticky = 'e', padx = 3, pady = 5)
+        dropdowns.append(filter_input)
         search_terms[filter] = filter_input.var.get()
         left_gridder.next_row()
 
@@ -560,7 +567,21 @@ def main():
     search_button.grid(row = left_gridder.row, column = left_gridder.column)
     left_gridder.next_row()
 
+    def clear_filters():
 
+        for dropdown in dropdowns:
+            dropdown.var.set('')
+            dropdown.dropdown._command(None)
+        student.set('')
+        filters.update({'Student': student.get()})
+        
+
+    clear_filters_butt = ctk.CTkButton(left_frame, text = 'Clear Filters', command = lambda: clear_filters())
+    clear_filters_butt.grid(row = left_gridder.row, column = left_gridder.column)
+    # ----------
+    # END LEFT FRAME
+    # BEGIN MAIN FRAME
+    # ----------
 
     main_frame = ctk.CTkFrame(app, border_width = 1, border_color = 'red')
     main_frame.rowconfigure(1, weight = 1)
