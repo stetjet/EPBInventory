@@ -8,7 +8,6 @@ from paths import FILTERS_PATH, REPORT_PATH
 import os
 
 # to do:
-#settings to allow for changing filter options
 #make create_shoes close on button click
 #main_frame automatically updates after changes
 #make student searchable instead of exact match
@@ -18,6 +17,7 @@ import os
 #make shoe_pk = bag. Can force pk?
 #add toepad, spacer, date sold
 #mark as reported on the reorder doc - Maybe this one belongs to the product id?
+#toplevels stay on top
 
 
 with open(FILTERS_PATH, 'r') as filters_file:
@@ -251,7 +251,9 @@ def update_return_values(target_frame:ctk.CTkFrame, grid_manager:GridManager, fi
         grid_manager.set_column(0)
         grid_manager.next_row()
 
-def create_shoe(quantity, filters):
+
+
+def create_shoe(quantity, filters, close_window, main_frame):
     debug_print(quantity)
     debug_print(filters)
     style = filters['Style Option']
@@ -264,16 +266,75 @@ def create_shoe(quantity, filters):
     availability = filters['Availability']
 
     created = 0
+    shoes_created = []
     while created < quantity:
         try:
             cur.execute(f"""INSERT INTO pointe_shoes (style, us_size, width, shank, vamp, shape, sole, availability) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)""", (style, size, width, shank, vamp, shape, sole, availability))
-            conn.commit()
+            shoes_created.append(cur.lastrowid)
         except Exception as e:
             conn.rollback()
             debug_print(e)
             raise e
+        # conn.commit()
         created += 1
+    confirmation_window = ctk.CTkToplevel()
+    display_frame = ctk.CTkFrame(confirmation_window, border_width = 1, border_color = 'red')
+    display_frame.rowconfigure(1, weight = 1)
+    display_frame.grid(row = 1, column = 1, columnspan = 7, rowspan = 5, sticky = 'nsew')
+    for index, num in enumerate(minwidths):
+        display_frame.columnconfigure(index, minsize = num)
+
+    main_gridder = GridManager()
+    main_gridder.set_column(1)
+    for index, column in enumerate(retrieve_columns('pointe_shoes')):
+        if column == 'shoe_pk':
+            header = 'Shoe ID'
+        elif column == 'us_size':
+            header = 'US Size'
+        elif column == 'us_half_size':
+            continue
+        else:
+            header = proper_string_from_snake_case(column)
+        column_label = ctk.CTkLabel(display_frame, text = header)
+        column_label.grid(row = main_gridder.row, column = main_gridder.column, padx = 10)
+        main_gridder.next_column()
+
+    main_gridder.next_row()
+    
+
+    for shoe in shoes_created:
+        main_gridder.set_column(0)
+        cur.execute("""SELECT * FROM pointe_shoes WHERE shoe_pk = ?""", (shoe,))
+        values = cur.fetchall()[0]
+        debug_print(values)
+        display_shoe = ShoeFrame(display_frame, main_gridder, values[0], values[1], values[2], values[3], values[4], values[5], values[6], values[7], values[8], values[9], values[10], values[11])
+        main_gridder.next_row()
+
+    main_gridder.set_column(0)
+    confirmation_label = ctk.CTkLabel(display_frame, text = 'Confirm: Do you want to add these shoes to the Inventory?')
+    
+    def confirmed():
+        conn.commit()
+        mb.showinfo("Shoes Created", "The shoes have been added to the inventory")
+        update_return_values(main_frame, main_gridder, filters)
+        confirmation_window.destroy()
+        close_window.destroy()
+
+    def denied():
+        conn.rollback()
+        mb.showinfo("Canceled", "The shoes have not been added to the inventory")
+        confirmation_window.destroy()
+
+    yes_button = ctk.CTkButton(display_frame, text = 'Yes', command = lambda : confirmed())
+    no_button = ctk.CTkButton(display_frame, text = 'Cancel', command = lambda : denied())
+
+    confirmation_label.grid(row = main_gridder.row, column = main_gridder.column, columnspan = 3)
+    main_gridder.next_row()
+    main_gridder.set_column(0)
+    yes_button.grid(row = main_gridder.row, column = main_gridder.column)
+    main_gridder.next_column()
+    no_button.grid(row = main_gridder.row, column = main_gridder.column)
 
 def receive_shoes():
     """Changes availability from 'Ordered' to 'Available'"""
@@ -391,7 +452,7 @@ def _populate_filters():
     filters['Comments'] = None
     return filters
 
-def open_shoe_create():
+def open_shoe_create(main_frame):
     shoe_create = ctk.CTkToplevel()
     filters = _populate_filters()
 
@@ -430,7 +491,7 @@ def open_shoe_create():
     creation_gridder.next_row()
 
 
-    create_button = ctk.CTkButton(shoe_create, text = 'Create Shoe', command = lambda: create_shoe(create_quantity.get(), filters))
+    create_button = ctk.CTkButton(shoe_create, text = 'Create Shoe', command = lambda: create_shoe(create_quantity.get(), filters, shoe_create, main_frame))
     create_button.grid(row = creation_gridder.row, column = creation_gridder.column)
     creation_gridder.next_row()
 
@@ -455,7 +516,7 @@ def main():
     inv_report_gen_button.grid(row = 0, column = 0)
     open_settings_button = ctk.CTkButton(top_frame, text = 'Settings', command = lambda : open_settings())
     open_settings_button.grid(row = 0, column = 2)
-    open_shoe_create_butt = ctk.CTkButton(top_frame, text = 'Create New Shoes', command = lambda : open_shoe_create())
+    open_shoe_create_butt = ctk.CTkButton(top_frame, text = 'Create New Shoes', command = lambda : open_shoe_create(main_frame))
     open_shoe_create_butt.grid(row = 0, column = 1)
 
     receive_shoe_butt = ctk.CTkButton(top_frame, text = 'Receive Selected Shoes', command = lambda: receive_shoes())
