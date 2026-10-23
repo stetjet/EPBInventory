@@ -12,6 +12,12 @@ import os
 #make create_shoes close on button click
 #main_frame automatically updates after changes
 #make student searchable instead of exact match
+#options for sorting csv
+#add search by bag
+#add clear filters
+#make shoe_pk = bag. Can force pk?
+#add toepad, spacer, date sold
+#mark as reported on the reorder doc - Maybe this one belongs to the product id?
 
 
 with open(FILTERS_PATH, 'r') as filters_file:
@@ -131,9 +137,72 @@ def _build_filtered_query(filters:dict = None):
     finished_query_string = raw_query + searchable_columns_string + ';'
     return finished_query_string
 
+def open_settings():
+    new_options = filter_options.copy()
+    debug_print(new_options)
+
+    class OptionWidget(ctk.CTkFrame):
+        def __init__(self, master, text, key):
+            super().__init__(master = master)
+
+            self.key = key
+            self.text = text
+            self.label = ctk.CTkLabel(self, text = self.text)
+            self.label.grid(row = 0, column = 1)
+            self.bind('<Button-3>', command = lambda e: self.remove_option())
+            self.label.bind('<Button-3>', command = lambda e: self.remove_option())
+
+        def remove_option(self):
+            new_options[self.key].remove(self.text)
+            debug_print(new_options)
+            self.destroy()
+
+    settings = ctk.CTkToplevel()
+    settings_gridder = GridManager()
 
 
+    settings_gridder.next_row()
 
+    for filter_index, filter in enumerate(filter_options):
+        filter_frame = ctk.CTkFrame(settings)
+        filter_frame.grid(row = settings_gridder.row, column = settings_gridder.column)
+        debug_print(filter)
+        list_frame = ctk.CTkScrollableFrame(filter_frame, label_text = filter)
+        list_frame.grid(row = settings_gridder.row, column = settings_gridder.column)
+        list_frame_gridder = GridManager()
+        for index,option in enumerate(filter_options[filter]):
+            if index == 0:
+                continue
+            dongle = OptionWidget(list_frame, option, filter)
+            dongle.grid(row = list_frame_gridder.row, column = list_frame_gridder.column, sticky = 'w')
+            list_frame_gridder.next_row()
+        settings_gridder.next_column()
+        if (filter_index + 1) % 4 == 0:
+            debug_print(filter)
+            debug_print(index)
+            debug_print(index % 3)
+            settings_gridder.next_row()
+            settings_gridder.set_column(0)
+
+
+    def save_settings():
+        try:
+            with open(FILTERS_PATH, 'w') as settings_file:
+                for key in new_options.keys():
+                    settings_file.write(f'{key}:\n')
+
+                    settings_file.write(f'  {str(new_options[key])}\n')
+            mb.showinfo("Settings Updated", "Filters have been updated")
+        except Exception as e:
+            debug_print(e)
+            raise e
+
+
+    save_settings_butt = ctk.CTkButton(settings, text = 'Save Changes', command = lambda: save_settings())
+    save_settings_butt.grid(row = settings_gridder.row, column = settings_gridder.column)
+
+
+        
 
 
 def is_blank(dictionary:dict) -> bool:
@@ -384,6 +453,8 @@ def main():
     top_frame.grid(row = 0, column = 0, columnspan = 8, sticky = 'nsew')
     inv_report_gen_button = ctk.CTkButton(top_frame, text = 'Generate Inventory Report', command = lambda: inventory_report())
     inv_report_gen_button.grid(row = 0, column = 0)
+    open_settings_button = ctk.CTkButton(top_frame, text = 'Settings', command = lambda : open_settings())
+    open_settings_button.grid(row = 0, column = 2)
     open_shoe_create_butt = ctk.CTkButton(top_frame, text = 'Create New Shoes', command = lambda : open_shoe_create())
     open_shoe_create_butt.grid(row = 0, column = 1)
 
